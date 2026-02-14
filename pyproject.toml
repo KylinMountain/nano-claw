@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Nano Agent Contributors"}
+    {name = "KylinMountain"}
 ]
 keywords = [
     "ai",
@@ -61,10 +61,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/nano-claw"
-Documentation = "https://github.com/yourusername/nano-claw/tree/main/docs"
-Repository = "https://github.com/yourusername/nano-claw"
-"Bug Tracker" = "https://github.com/yourusername/nano-claw/issues"
+Homepage = "https://github.com/KylinMountain/nano-claw"
+Documentation = "https://github.com/KylinMountain/nano-claw/tree/main/docs"
+Repository = "https://github.com/KylinMountain/nano-claw"
+"Bug Tracker" = "https://github.com/KylinMountain/nano-claw/issues"
 
 [project.scripts]
 nano-claw = "nano_claw.main:main"

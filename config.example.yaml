@@ -60,6 +60,20 @@ mcp:
       env:
         NODE_ENV: production
 
+    # Jina AI Remote MCP（官方）
+    # 文档：https://github.com/jina-ai/MCP
+    jina:
+      command: npx
+      args:
+        - "-y"
+        - "mcp-remote"
+        - "https://mcp.jina.ai/v1"
+        - "--header"
+        - "Authorization: Bearer ${JINA_API_KEY}"
+      env:
+        # 注意：这里不要写死真实 key，按需替换为你的本地值
+        JINA_API_KEY: "YOUR_JINA_API_KEY_HERE"
+
     # 其他常用服务器示例（注释掉，需要时启用）
     # sqlite:
     #   command: uvx

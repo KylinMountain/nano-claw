@@ -11,12 +11,12 @@ long_description = (this_directory / "README.md").read_text(encoding='utf-8')
 setup(
     name="nano-claw",
     version="0.1.0",
-    author="Nano Agent Contributors",
+    author="KylinMountain",
     author_email="",
     description="A lightweight AI agent framework in ~5K lines of code",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/nano-claw",
+    url="https://github.com/KylinMountain/nano-claw",
     packages=find_packages(exclude=["tests", "examples", "docs"]),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -79,8 +79,8 @@ setup(
         "automation",
     ],
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/nano-claw/issues",
-        "Source": "https://github.com/yourusername/nano-claw",
-        "Documentation": "https://github.com/yourusername/nano-claw/tree/main/docs",
+        "Bug Reports": "https://github.com/KylinMountain/nano-claw/issues",
+        "Source": "https://github.com/KylinMountain/nano-claw",
+        "Documentation": "https://github.com/KylinMountain/nano-claw/tree/main/docs",
     },
 )
