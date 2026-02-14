@@ -1,0 +1,67 @@
+# Nano Claw 示例配置文件
+# 使用方式：
+#   cp config.example.yaml config.yaml
+#   然后填入你的真实 API Key
+
+# LLM 配置
+llm:
+  provider: openai           # openai 或 gemini
+  api_key: "YOUR_API_KEY_HERE"
+
+  openai:
+    model: "LongCat-Flash-Chat"
+    base_url: "https://api.longcat.chat/openai/v1"
+
+  gemini:
+    model: gemini-2.0-flash
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+
+# Agent 配置
+agent:
+  max_turns: 50               # 最大对话轮数
+  temperature: 0.7            # 生成温度
+  enable_compression: true    # 启用历史压缩
+  auto_approve_readonly: true # 自动批准只读操作
+  approval_mode: default      # 批准模式
+
+# 系统提示词
+system_prompt: |
+  You are Nano Claw, a helpful AI assistant with access to tools.
+
+  When using tools:
+  1. Explain your intent before calling a tool
+  2. Use the exact tool name and parameters
+  3. Wait for results before proceeding
+  4. Report the outcome to the user
+
+  Be concise but thorough in your responses.
+
+# Skills 配置
+skills:
+  enabled: true
+  directories:
+    builtin: ./skills/builtin
+    user: ~/.nano_claw/skills
+    workspace: .nano_claw/skills
+
+# 记忆系统配置
+memory:
+  enabled: true
+  global_dir: ~/.nano_claw
+
+# MCP 服务器配置
+mcp:
+  enabled: true
+  servers:
+    # 文件系统服务器 - 提供文件操作工具
+    filesystem:
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+      env:
+        NODE_ENV: production
+
+    # 其他常用服务器示例（注释掉，需要时启用）
+    # sqlite:
+    #   command: uvx
+    #   args: ["mcp-server-sqlite", "--db-path", "./data.db"]
+    #   env: {}
