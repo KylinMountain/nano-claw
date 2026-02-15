@@ -17,6 +17,9 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
             if user_config:
                 # 合并配置
                 config = deep_merge(config, user_config)
+
+    # 兼容官方常见 MCP 配置风格：mcpServers（顶层或 mcp 内）
+    _normalize_mcp_servers(config)
     
     # 从环境变量读取API密钥
     if not config['llm'].get('api_key'):
@@ -33,8 +36,35 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
     
     if config['memory'].get('global_dir'):
         config['memory']['global_dir'] = os.path.expanduser(config['memory']['global_dir'])
+
+    if config.get('external_coder', {}).get('working_dir'):
+        config['external_coder']['working_dir'] = os.path.expanduser(
+            config['external_coder']['working_dir']
+        )
     
     return config
+
+
+def _normalize_mcp_servers(config: Dict[str, Any]) -> None:
+    """
+    兼容以下 MCP 配置形态：
+    1) 顶层 mcpServers
+    2) mcp.mcpServers
+    并统一映射到 mcp.servers
+    """
+    mcp_cfg = config.setdefault("mcp", {})
+    mcp_cfg.setdefault("servers", {})
+
+    top_level_servers = config.get("mcpServers")
+    nested_servers = mcp_cfg.get("mcpServers")
+
+    for source in (top_level_servers, nested_servers):
+        if isinstance(source, dict):
+            mcp_cfg["servers"] = deep_merge(mcp_cfg["servers"], source)
+
+    # 只要有 servers，就默认开启 mcp
+    if isinstance(mcp_cfg.get("servers"), dict) and mcp_cfg["servers"]:
+        mcp_cfg["enabled"] = True
 
 
 def get_default_config() -> Dict[str, Any]:
@@ -79,6 +109,17 @@ Be concise but thorough in your responses.''',
         'memory': {
             'enabled': True,
             'global_dir': '~/.nano_claw'
+        },
+        'external_coder': {
+            'enabled': True,
+            'provider': 'gemini_cli',
+            'command': 'gemini',
+            'args_template': ['-p', '{task}'],
+            'timeout': 600,
+            'working_dir': '.',
+            'allow_commands': ['gemini', 'codex'],
+            'pass_through_env': ['PATH', 'HOME', 'SHELL'],
+            'extra_env': {}
         },
         'mcp': {
             'enabled': False,

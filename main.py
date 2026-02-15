@@ -22,6 +22,7 @@ from core.types import EventType
 from skills.manager import SkillManager, ActivateSkillTool
 from memory.manager import MemoryManager
 from mcp_client.client import MCPManager, MCPServerConfig
+from tools.external_coder import ExternalCoderSettings, ExternalCoderTool
 
 
 console = Console()
@@ -103,12 +104,7 @@ class NanoAgentApp:
         if self.config['mcp']['enabled']:
             self.mcp_manager = MCPManager()
             for server_name, server_config in self.config['mcp']['servers'].items():
-                mcp_config = MCPServerConfig(
-                    name=server_name,
-                    command=server_config.get('command'),
-                    args=server_config.get('args', []),
-                    env=server_config.get('env', {})
-                )
+                mcp_config = MCPServerConfig.from_dict(server_name, server_config)
                 success = await self.mcp_manager.add_server(mcp_config)
                 if success:
                     console.print(f"[green]✓ MCP server connected: {server_name}[/green]")
@@ -154,6 +150,12 @@ class NanoAgentApp:
         if self.skill_manager and self.skill_manager.get_available_skills():
             activate_skill_tool = ActivateSkillTool(self.skill_manager)
             self.agent.tool_registry.register(activate_skill_tool)
+
+        # 注册外部编程代理工具（默认 gemini CLI）
+        external_coder_cfg = self.config.get('external_coder', {})
+        if external_coder_cfg.get('enabled', False):
+            settings = ExternalCoderSettings.from_dict(external_coder_cfg)
+            self.agent.tool_registry.register(ExternalCoderTool(settings))
         
         # 注册MCP工具
         if self.mcp_manager:

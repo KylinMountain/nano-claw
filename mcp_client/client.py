@@ -4,12 +4,15 @@ MCP (Model Context Protocol) 客户端
 """
 import asyncio
 import logging
+import os
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from contextlib import AsyncExitStack
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 
 from tools.base import ToolBuilder, ToolInvocation, ToolKind, ToolResult
 
@@ -20,15 +23,49 @@ logger = logging.getLogger(__name__)
 class MCPServerConfig:
     """MCP服务器配置"""
     name: str
-    command: str
+    command: Optional[str] = None
     args: List[str] = None
     env: Dict[str, str] = None
+    transport: str = "stdio"
+    url: Optional[str] = None
+    headers: Dict[str, str] = None
+    timeout: float = 30.0
+    sse_read_timeout: float = 300.0
     
     def __post_init__(self):
         if self.args is None:
             self.args = []
         if self.env is None:
             self.env = {}
+        if self.headers is None:
+            self.headers = {}
+        if self.url and not self.transport:
+            self.transport = "streamable_http"
+
+    @classmethod
+    def from_dict(cls, name: str, config: Dict[str, Any]) -> "MCPServerConfig":
+        """
+        从配置字典创建 MCPServerConfig。
+
+        支持两种形式：
+        1) stdio 形式：command/args/env
+        2) remote 形式：url/headers（可选 transport）
+        """
+        transport = config.get("transport")
+        if not transport:
+            transport = "streamable_http" if config.get("url") else "stdio"
+
+        return cls(
+            name=name,
+            command=config.get("command"),
+            args=config.get("args", []),
+            env=config.get("env", {}),
+            transport=transport,
+            url=config.get("url"),
+            headers=config.get("headers", {}),
+            timeout=float(config.get("timeout", 30)),
+            sse_read_timeout=float(config.get("sse_read_timeout", 300)),
+        )
 
 
 class MCPConnection:
@@ -46,17 +83,47 @@ class MCPConnection:
     async def connect(self) -> bool:
         """建立连接"""
         try:
-            # 创建服务器参数
-            server_params = StdioServerParameters(
-                command=self.config.command,
-                args=self.config.args,
-                env=self.config.env
-            )
-            
-            # 建立stdio连接
-            read, write = await self.exit_stack.enter_async_context(
-                stdio_client(server_params)
-            )
+            transport = (self.config.transport or "stdio").lower()
+            if transport in ("streamable-http", "streamablehttp", "http"):
+                transport = "streamable_http"
+
+            if transport == "stdio":
+                if not self.config.command:
+                    raise ValueError(f"MCP server '{self.config.name}' missing required field: command")
+                # 创建服务器参数
+                server_params = StdioServerParameters(
+                    command=self.config.command,
+                    args=self.config.args,
+                    env=self._resolve_env(self.config.env)
+                )
+                read, write = await self.exit_stack.enter_async_context(
+                    stdio_client(server_params)
+                )
+            elif transport == "streamable_http":
+                if not self.config.url:
+                    raise ValueError(f"MCP server '{self.config.name}' missing required field: url")
+                client_ctx = streamablehttp_client(
+                    url=self._resolve_string(self.config.url),
+                    headers=self._resolve_dict(self.config.headers) or None,
+                    timeout=self.config.timeout,
+                    sse_read_timeout=self.config.sse_read_timeout,
+                )
+                read, write, _ = await self.exit_stack.enter_async_context(client_ctx)
+            elif transport == "sse":
+                if not self.config.url:
+                    raise ValueError(f"MCP server '{self.config.name}' missing required field: url")
+                read, write = await self.exit_stack.enter_async_context(
+                    sse_client(
+                        url=self._resolve_string(self.config.url),
+                        headers=self._resolve_dict(self.config.headers) or None,
+                        timeout=self.config.timeout,
+                        sse_read_timeout=self.config.sse_read_timeout,
+                    )
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported MCP transport '{self.config.transport}' for server '{self.config.name}'"
+                )
             
             # 创建客户端会话
             self.session = await self.exit_stack.enter_async_context(
@@ -77,6 +144,24 @@ class MCPConnection:
             logger.error(f"MCP connection error for '{self.config.name}': {e}")
             await self.disconnect()
             return False
+
+    def _resolve_string(self, value: str) -> str:
+        """解析字符串中的环境变量占位符，例如 ${TOKEN}。"""
+        return os.path.expandvars(value)
+
+    def _resolve_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """递归解析字典中的字符串环境变量。"""
+        resolved: Dict[str, Any] = {}
+        for key, value in (data or {}).items():
+            if isinstance(value, str):
+                resolved[key] = self._resolve_string(value)
+            else:
+                resolved[key] = value
+        return resolved
+
+    def _resolve_env(self, env: Dict[str, str]) -> Dict[str, str]:
+        """解析 env 值中的变量引用。"""
+        return {k: self._resolve_string(str(v)) for k, v in (env or {}).items()}
     
     async def _discover_capabilities(self):
         """发现服务器能力"""
@@ -188,8 +273,10 @@ class MCPConnection:
             await self.exit_stack.aclose()
             self._connected = False
             logger.debug(f"MCP server '{self.config.name}' disconnected")
-        except Exception as e:
-            logger.error(f"Error disconnecting MCP server '{self.config.name}': {e}")
+        except BaseException as e:
+            # 某些 MCP 传输在关闭时会抛 CancelledError，不应导致主程序退出失败。
+            self._connected = False
+            logger.warning(f"Error disconnecting MCP server '{self.config.name}': {e}")
 
 
 class MCPToolInvocation(ToolInvocation):

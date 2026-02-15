@@ -49,6 +49,18 @@ memory:
   enabled: true
   global_dir: ~/.nano_claw
 
+# 外部编程代理配置（默认使用本地 gemini CLI）
+external_coder:
+  enabled: true
+  provider: gemini_cli
+  command: gemini
+  args_template: ["-p", "{task}"]
+  timeout: 600
+  working_dir: .
+  allow_commands: ["gemini", "codex"]
+  pass_through_env: ["PATH", "HOME", "SHELL"]
+  extra_env: {}
+
 # MCP 服务器配置
 mcp:
   enabled: true
