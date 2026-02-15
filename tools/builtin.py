@@ -359,11 +359,21 @@ class AskUserInvocation(ToolInvocation):
     
     async def execute(self, cancellation_event: asyncio.Event) -> ToolResult:
         try:
-            # 等待用户响应
+            question = self.params.get("question", "Please provide your input:")
+            options = self.params.get("options") or []
+            timeout = int(self.params.get("timeout", 300))
+
+            prompt = f"\n[AskUser] {question}"
+            if options:
+                prompt += f"\nOptions: {', '.join(str(o) for o in options)}"
+            prompt += "\nYour response: "
+
+            # 终端直连输入，避免工具调用后无响应悬挂。
             response = await asyncio.wait_for(
-                self._response_future,
-                timeout=300  # 5分钟超时
+                asyncio.to_thread(input, prompt),
+                timeout=timeout
             )
+            self.set_response(response)
             
             return ToolResult(
                 call_id=self.call_id,
@@ -399,6 +409,11 @@ class AskUserTool(ToolBuilder):
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Optional predefined options"
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Timeout in seconds for waiting user response",
+                        "default": 300
                     }
                 },
                 "required": ["question"]
