@@ -13,6 +13,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style
 
 from config_loader import load_config
 from core.llm_client import LLMClient
@@ -26,6 +28,9 @@ from tools.external_coder import ExternalCoderSettings, ExternalCoderTool
 
 
 console = Console()
+prompt_style = Style.from_dict({
+    "prompt": "#00aa00 bold",
+})
 
 
 class NanoAgentApp:
@@ -37,6 +42,7 @@ class NanoAgentApp:
         self.skill_manager = None
         self.memory_manager = None
         self.mcp_manager = None
+        self.prompt_session = PromptSession(style=prompt_style)
     
     def print_banner(self):
         """打印欢迎信息"""
@@ -202,7 +208,7 @@ class NanoAgentApp:
         call_id = event.data.get("call_id")
 
         console.print(Panel(prompt, title=title, border_style="yellow"))
-        response = await asyncio.to_thread(input, "Proceed? [y/N]: ")
+        response = await self.prompt_session.prompt_async("Proceed? [y/N]: ", style="class:prompt")
         approved = response.strip().lower() in ("y", "yes")
         self.agent.respond_to_confirmation(call_id, approved)
     
@@ -229,7 +235,8 @@ class NanoAgentApp:
         while True:
             try:
                 # 使用简单的input代替prompt_toolkit
-                user_input = input("You: ").strip()
+                user_input = await self.prompt_session.prompt_async("You: ", style="class:prompt")
+                user_input = user_input.strip()
                 
                 if not user_input:
                     continue
