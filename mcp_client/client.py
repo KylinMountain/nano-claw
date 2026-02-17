@@ -274,9 +274,21 @@ class MCPConnection:
             self._connected = False
             logger.debug(f"MCP server '{self.config.name}' disconnected")
         except BaseException as e:
-            # 某些 MCP 传输在关闭时会抛 CancelledError，不应导致主程序退出失败。
             self._connected = False
-            logger.warning(f"Error disconnecting MCP server '{self.config.name}': {e}")
+            # 某些 MCP 传输在关闭时会抛 CancelledError / cancel scope 等，
+            # 这些属于退出阶段可预期行为，不需要污染终端输出。
+            text = str(e).lower()
+            expected = (
+                "cancelled",
+                "cancel scope",
+                "event loop is closed",
+                "attempted to exit a cancel scope",
+                "aborterror",
+            )
+            if any(t in text for t in expected):
+                logger.debug(f"MCP server '{self.config.name}' disconnected with expected shutdown signal: {e}")
+            else:
+                logger.warning(f"Error disconnecting MCP server '{self.config.name}': {e}")
 
 
 class MCPToolInvocation(ToolInvocation):
