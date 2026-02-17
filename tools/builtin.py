@@ -109,17 +109,40 @@ class WriteFileInvocation(ToolInvocation):
         try:
             file_path = self.params.get("path", "")
             content = self.params.get("content", "")
-            
-            # 确保目录存在
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
+
+            if not file_path:
+                return ToolResult(
+                    call_id=self.call_id,
+                    success=False,
+                    content="",
+                    error="Missing required parameter: path"
+                )
+
+            original_path = file_path
+            cwd = os.getcwd()
+
+            # 如果给了不可写的绝对路径，自动回落到当前目录同名文件。
+            if os.path.isabs(file_path):
+                target_dir = os.path.dirname(file_path) or file_path
+                if not os.access(target_dir, os.W_OK):
+                    file_path = os.path.join(cwd, os.path.basename(file_path))
+
+            # 确保目录存在（仅当目录非空）
+            target_dir = os.path.dirname(file_path)
+            if target_dir:
+                os.makedirs(target_dir, exist_ok=True)
+
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
-            
+
+            message = f"Successfully wrote to {file_path}"
+            if file_path != original_path:
+                message += f" (fallback from unwritable path: {original_path})"
+
             return ToolResult(
                 call_id=self.call_id,
                 success=True,
-                content=f"Successfully wrote to {file_path}"
+                content=message
             )
         except Exception as e:
             return ToolResult(

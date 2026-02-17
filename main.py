@@ -43,6 +43,17 @@ class NanoAgentApp:
         self.memory_manager = None
         self.mcp_manager = None
         self.prompt_session = PromptSession(style=prompt_style)
+
+    def _generate_coding_routing_prompt(self) -> str:
+        """为编程任务注入路由约束，优先使用外部编程代理。"""
+        return """## Coding Task Routing
+
+For software implementation tasks:
+1. Prefer activating and following `coding-router` skill if available.
+2. Prefer `run_external_coder` for broad or multi-file implementation tasks.
+3. Use direct `write_file` only for small, targeted edits.
+4. If user does not specify path, default file outputs to current working directory.
+"""
     
     def print_banner(self):
         """打印欢迎信息"""
@@ -151,11 +162,16 @@ class NanoAgentApp:
             self.agent.add_context_generator(self.skill_manager.generate_skills_prompt)
         if self.memory_manager:
             self.agent.add_context_generator(self.memory_manager.format_for_system_prompt)
+        self.agent.add_context_generator(self._generate_coding_routing_prompt)
         
         # 注册ActivateSkill工具
         if self.skill_manager and self.skill_manager.get_available_skills():
             activate_skill_tool = ActivateSkillTool(self.skill_manager)
             self.agent.tool_registry.register(activate_skill_tool)
+
+            # 自动激活 coding-router，提升编程任务路由稳定性。
+            if self.skill_manager.get_skill("coding-router"):
+                self.skill_manager.activate_skill("coding-router")
 
         # 注册外部编程代理工具（默认 gemini CLI）
         external_coder_cfg = self.config.get('external_coder', {})
